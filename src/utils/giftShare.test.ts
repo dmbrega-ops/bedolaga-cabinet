@@ -68,3 +68,43 @@ describe('buildGiftClaimArtifacts', () => {
     expect(buildGiftClaimArtifacts(legacy, { ...context, botUsername: '' }).botLink).toBeNull();
   });
 });
+
+describe('buildGiftShareMessage', () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    options ? `${key} ${JSON.stringify(options)}` : key;
+  const links = { botLink: 'https://t.me/ExampleBot?start=GIFT_x', cabinetLink: 'https://cab/x' };
+  const details = {
+    appName: 'Brega VPN',
+    senderName: 'Аня',
+    tariffName: 'Безлимит',
+    periodDays: 30,
+    deviceLimit: 3,
+    giftMessage: '  С днём рождения!  ',
+  };
+
+  it('говорит, что это VPN, от кого он и что внутри', () => {
+    const message = buildGiftShareMessage(t, details, links);
+
+    expect(message).toContain('gift.shareTitleFrom {"sender":"Аня","appName":"Brega VPN"}');
+    expect(message).toContain('gift.shareAbout');
+    expect(message).toContain('📦 «Безлимит» · gift.shareDays {"count":30}');
+    expect(message).toContain('gift.deviceCount {"count":3}');
+    expect(message).toContain('gift.sharePersonalMessage {"message":"С днём рождения!"}');
+    expect(message).toContain(links.botLink);
+    expect(message).toContain(`gift.shareViaCabinet {"link":"${links.cabinetLink}"}`);
+  });
+
+  it('без имени дарителя, деталей и бота не оставляет пустых строк-хвостов', () => {
+    const message = buildGiftShareMessage(
+      t,
+      { ...details, senderName: null, tariffName: null, periodDays: null, deviceLimit: null, giftMessage: null },
+      { botLink: null, cabinetLink: links.cabinetLink },
+    );
+
+    expect(message).toContain('gift.shareTitle {"appName":"Brega VPN"}');
+    expect(message).not.toContain('📦');
+    expect(message).not.toContain('gift.shareViaBot');
+    expect(message).toContain('gift.shareViaCabinetOnly');
+    expect(message).not.toMatch(/\n\n\n/);
+  });
+});

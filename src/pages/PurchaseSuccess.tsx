@@ -8,6 +8,8 @@ import { landingApi } from '../api/landings';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../store/auth';
 import { copyToClipboard } from '../utils/clipboard';
+import { buildGiftShareMessage } from '../utils/giftShare';
+import { useGiftShareContext } from '../hooks/useGiftShareContext';
 import { CheckIcon, ClipboardIcon, ClockIcon, ExclamationIcon } from '@/components/icons';
 import { Spinner } from '@/components/ui/Spinner';
 import { AnimatedCheckmark } from '@/components/ui/AnimatedCheckmark';
@@ -571,14 +573,13 @@ function GiftLinkShareState({
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
-  const message = [
-    t('landing.giftLink.shareText', 'I have a gift for you! Activate it here:'),
-    '',
-    claimUrl,
-    botClaimLink ? `${t('landing.giftLink.viaTelegram', 'Telegram:')} ${botClaimLink}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const { appName, senderName } = useGiftShareContext();
+
+  const message = buildGiftShareMessage(
+    t,
+    { appName, senderName, tariffName, periodDays, giftMessage: null },
+    { botLink: botClaimLink, cabinetLink: claimUrl },
+  );
 
   const handleCopy = async () => {
     try {

@@ -85,6 +85,10 @@ export interface GiftPurchaseStatus {
   tariff_name: string | null;
   period_days: number | null;
   warning: string | null;
+  /** Canonical claim artifacts. Absent on older backends and while the gift is not claimable. */
+  gift_code?: string | null;
+  bot_claim_url?: string | null;
+  cabinet_claim_url?: string | null;
 }
 
 export interface PendingGift {

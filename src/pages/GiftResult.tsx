@@ -4,13 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { giftApi } from '../api/gift';
-import { brandingApi, type TelegramWidgetConfig } from '../api/branding';
+import { giftApi, type GiftPurchaseStatus } from '../api/gift';
 import { Spinner } from '@/components/ui/Spinner';
 import { AnimatedCheckmark } from '@/components/ui/AnimatedCheckmark';
 import { AnimatedCrossmark } from '@/components/ui/AnimatedCrossmark';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/utils/clipboard';
+import { buildGiftClaimArtifacts, buildGiftShareMessage } from '@/utils/giftShare';
+import { useGiftShareContext } from '@/hooks/useGiftShareContext';
 import { CheckIcon, CopyIcon, InfoIcon, ExclamationIcon, ClockIcon } from '@/components/icons';
 
 const MAX_POLL_MS = 10 * 60 * 1000; // 10 minutes
@@ -43,47 +44,31 @@ function PendingState() {
   );
 }
 
-function CodeOnlySuccessState({
-  purchaseToken,
-  tariffName,
-  periodDays,
-}: {
-  purchaseToken: string;
-  tariffName: string | null;
-  periodDays: number | null;
-}) {
+function CodeOnlySuccessState({ status }: { status: GiftPurchaseStatus }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const { botUsername, appName, senderName } = useGiftShareContext();
 
-  // Bot username comes from the runtime branding config; the build-time env var
-  // is only a fallback. Otherwise the "activate via bot" line silently vanishes
-  // on deployments that don't set VITE_TELEGRAM_BOT_USERNAME at build time.
-  const { data: widgetConfig } = useQuery<TelegramWidgetConfig>({
-    queryKey: ['telegram-widget-config'],
-    queryFn: brandingApi.getTelegramWidgetConfig,
-    staleTime: 60000,
-  });
-  const botUsername =
-    widgetConfig?.bot_username || import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
+  // `purchase_token` here is only the 12-char display id: the bot and the cabinet
+  // reject claims shorter than 48 chars, so links must come from the API fields.
+  const { code: giftCode, botLink, cabinetLink } = buildGiftClaimArtifacts(
+    {
+      token: status.purchase_token ?? '',
+      gift_code: status.gift_code ?? null,
+      bot_claim_url: status.bot_claim_url ?? null,
+      cabinet_claim_url: status.cabinet_claim_url ?? null,
+    },
+    { botUsername, origin: window.location.origin },
+  );
+  const tariffName = status.tariff_name;
+  const periodDays = status.period_days;
 
-  const shortCode = purchaseToken.slice(0, 12);
-  const giftCode = `GIFT-${shortCode}`;
-  // Telegram forwards the start parameter to the bot verbatim (no URL-decoding),
-  // and "_" is a valid start-param char — so use a literal "GIFT_" prefix to
-  // match the bot's `start_parameter.startswith('GIFT_')` handler. Encoding the
-  // underscore as %5F made the bot receive "GIFT%5F…" and silently fail.
-  const botLink = botUsername ? `https://t.me/${botUsername}?start=GIFT_${shortCode}` : null;
-  const cabinetLink = `${window.location.origin}/gift?tab=activate&code=${encodeURIComponent(shortCode)}`;
-
-  const fullMessage = [
-    t('gift.shareText', 'I have a gift for you! Activate it here:'),
-    '',
-    botLink ? `${t('gift.shareModalActivateVia', 'Activate via bot:')} ${botLink}` : null,
-    `${t('gift.shareModalActivateViaCabinet', 'Or via website:')} ${cabinetLink}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const fullMessage = buildGiftShareMessage(
+    t,
+    { appName, senderName, tariffName, periodDays, giftMessage: status.gift_message },
+    { botLink, cabinetLink },
+  );
 
   const handleCopy = async () => {
     try {
@@ -132,29 +117,12 @@ function CodeOnlySuccessState({
 
       {/* Share message preview */}
       <div className="w-full rounded-xl border border-dark-700/30 bg-dark-800/40 p-4 text-left">
-        <p className="mb-3 text-sm font-medium text-dark-100">
-          {t('gift.shareText', 'I have a gift for you! Activate it here:')}
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-dark-400">
+          {t('gift.sharePreview', 'Message to share')}
         </p>
-
-        {botLink && (
-          <div className="mb-2">
-            <p className="mb-1 text-xs font-medium text-dark-400">
-              {t('gift.shareModalActivateVia', 'Activate via bot:')}
-            </p>
-            <p className="truncate rounded-lg bg-dark-900/60 px-3 py-2 text-sm text-accent-400">
-              {botLink}
-            </p>
-          </div>
-        )}
-
-        <div>
-          <p className="mb-1 text-xs font-medium text-dark-400">
-            {t('gift.shareModalActivateViaCabinet', 'Or via website:')}
-          </p>
-          <p className="truncate rounded-lg bg-dark-900/60 px-3 py-2 text-sm text-accent-400">
-            {cabinetLink}
-          </p>
-        </div>
+        <p className="whitespace-pre-wrap text-sm text-dark-100 [overflow-wrap:anywhere]">
+          {fullMessage}
+        </p>
       </div>
 
       {/* Copy button */}
@@ -542,11 +510,7 @@ export default function GiftResult() {
         {isError ? (
           <PollErrorState />
         ) : isClaimablePaid ? (
-          <CodeOnlySuccessState
-            purchaseToken={status.purchase_token!}
-            tariffName={status.tariff_name}
-            periodDays={status.period_days}
-          />
+          <CodeOnlySuccessState status={status} />
         ) : isDelivered ? (
           <DeliveredState
             recipientContact={status.recipient_contact_value}

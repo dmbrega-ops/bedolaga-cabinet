@@ -13,7 +13,6 @@ import {
   scanWithTelegram,
   type Html5QrcodeInstance,
 } from '@/utils/qrScanner';
-import { brandingApi, type TelegramWidgetConfig } from '../api/branding';
 import type {
   GiftConfig,
   GiftTariff,
@@ -26,7 +25,8 @@ import type {
 
 import { cn } from '../lib/utils';
 import { copyToClipboard } from '../utils/clipboard';
-import { buildGiftClaimArtifacts } from '../utils/giftShare';
+import { buildGiftClaimArtifacts, buildGiftShareMessage } from '../utils/giftShare';
+import { useGiftShareContext } from '../hooks/useGiftShareContext';
 import { getApiErrorMessage } from '../utils/api-error';
 import { formatPrice } from '../utils/format';
 import { pickBestValue } from '../utils/bestValue';
@@ -1004,15 +1004,7 @@ function SentGiftCard({ gift }: { gift: SentGift }) {
   const { t } = useTranslation();
   const [showToast, setShowToast] = useState(false);
 
-  // Runtime bot username (env var is only a fallback) so the "activate via bot"
-  // line never silently disappears when VITE_TELEGRAM_BOT_USERNAME is unset.
-  const { data: widgetConfig } = useQuery<TelegramWidgetConfig>({
-    queryKey: ['telegram-widget-config'],
-    queryFn: brandingApi.getTelegramWidgetConfig,
-    staleTime: 60000,
-  });
-  const botUsername =
-    widgetConfig?.bot_username || import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
+  const { botUsername, appName, senderName } = useGiftShareContext();
 
   const artifacts = buildGiftClaimArtifacts(gift, {
     botUsername,
@@ -1028,19 +1020,22 @@ function SentGiftCard({ gift }: { gift: SentGift }) {
       ? t('gift.statusAvailable')
       : t(getGiftStatusKey(gift.status));
 
-  const buildShareMessage = useCallback(() => {
-    // Literal "GIFT_" prefix: Telegram forwards the start param to the bot
-    // verbatim (no URL-decoding), so the previously-encoded "%5F" never matched
-    // the bot's `start_parameter.startswith('GIFT_')` handler.
-    return [
-      t('gift.shareText'),
-      '',
-      artifacts.botLink ? `${t('gift.shareModalActivateVia')} ${artifacts.botLink}` : null,
-      `${t('gift.shareModalActivateViaCabinet')} ${artifacts.cabinetLink}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }, [artifacts.botLink, artifacts.cabinetLink, t]);
+  const buildShareMessage = useCallback(
+    () =>
+      buildGiftShareMessage(
+        t,
+        {
+          appName,
+          senderName,
+          tariffName: gift.tariff_name,
+          periodDays: gift.period_days,
+          deviceLimit: gift.device_limit,
+          giftMessage: gift.gift_message,
+        },
+        { botLink: artifacts.botLink, cabinetLink: artifacts.cabinetLink },
+      ),
+    [appName, senderName, gift, artifacts.botLink, artifacts.cabinetLink, t],
+  );
 
   const handleShare = useCallback(async () => {
     const message = buildShareMessage();
