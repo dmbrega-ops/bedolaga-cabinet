@@ -52,7 +52,11 @@ function CodeOnlySuccessState({ status }: { status: GiftPurchaseStatus }) {
 
   // `purchase_token` here is only the 12-char display id: the bot and the cabinet
   // reject claims shorter than 48 chars, so links must come from the API fields.
-  const { code: giftCode, botLink, cabinetLink } = buildGiftClaimArtifacts(
+  const {
+    code: giftCode,
+    botLink,
+    cabinetLink,
+  } = buildGiftClaimArtifacts(
     {
       token: status.purchase_token ?? '',
       gift_code: status.gift_code ?? null,

@@ -97,7 +97,14 @@ describe('buildGiftShareMessage', () => {
   it('без имени дарителя, деталей и бота не оставляет пустых строк-хвостов', () => {
     const message = buildGiftShareMessage(
       t,
-      { ...details, senderName: null, tariffName: null, periodDays: null, deviceLimit: null, giftMessage: null },
+      {
+        ...details,
+        senderName: null,
+        tariffName: null,
+        periodDays: null,
+        deviceLimit: null,
+        giftMessage: null,
+      },
       { botLink: null, cabinetLink: links.cabinetLink },
     );
 
