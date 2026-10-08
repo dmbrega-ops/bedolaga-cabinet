@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGiftClaimArtifacts } from './giftShare';
+import { buildGiftClaimArtifacts, buildGiftShareMessage } from './giftShare';
 
 /**
  * Ссылка на подарок из кабинета обязана открываться в боте.
