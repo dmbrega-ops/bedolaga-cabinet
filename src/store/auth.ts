@@ -22,6 +22,7 @@ import {
 } from '../utils/token';
 import { usePermissionStore } from './permissions';
 import { safeLocal } from '../utils/safeStorage';
+import { syncSiteNameCookie } from '../utils/siteNameCookie';
 
 export interface TelegramWidgetData {
   id: number;
@@ -456,6 +457,15 @@ export const useAuthStore = create<AuthState>()(
 
 captureCampaignFromUrl();
 captureReferralFromUrl();
+
+// Ponteto: let ponteto.com show the client's name instead of «Войти».
+useAuthStore.subscribe((state) => {
+  try {
+    syncSiteNameCookie(state);
+  } catch {
+    // Cookie access can throw in sandboxed webviews; the site just shows «Войти».
+  }
+});
 
 // Note: initialize() is kicked off from main.tsx after the Telegram SDK is set up,
 // so CloudStorage-backed token recovery can run during bootstrap.
